@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON_LOTTERY_PROTOCOL // 赛博朋克抽奖系统</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --text-main: #e0e0e0;
+            --cyan: #00f3ff;
+            --purple: #bc13fe;
+            --yellow: #fcee0a;
+            --red: #ff003c;
+            --font-main: 'Share Tech Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 扫描线背景特效 */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+        /* 噪点暗角背景 */
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            position: relative;
+            z-index: 10;
+            padding: 2rem;
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid #222;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+        }
+
+        /* 故障标题特效 */
+        h1.glitch {
+            font-size: 2.5rem;
+            text-align: center;
+            text-transform: uppercase;
+            position: relative;
+            margin-bottom: 2rem;
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+            letter-spacing: 2px;
+        }
+
+        h1.glitch::before, h1.glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+        }
+
+        h1.glitch::before {
+            left: 2px;
+            text-shadow: -2px 0 var(--red);
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim 5s infinite linear alternate-reverse;
+        }
+
+        h1.glitch::after {
+            left: -2px;
+            text-shadow: -2px 0 var(--yellow);
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim2 5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 83px, 0); }
+            20% { clip: rect(65px, 9999px, 12px, 0); }
+            40% { clip: rect(32px, 9999px, 54px, 0); }
+            60% { clip: rect(78px, 9999px, 23px, 0); }
+            80% { clip: rect(45px, 9999px, 76px, 0); }
+            100% { clip: rect(12px, 9999px, 98px, 0); }
+        }
+        @keyframes glitch-anim2 {
+            0% { clip: rect(32px, 9999px, 12px, 0); }
+            20% { clip: rect(76px, 9999px, 65px, 0); }
+            40% { clip: rect(12px, 9999px, 87px, 0); }
+            60% { clip: rect(98px, 9999px, 34px, 0); }
+            80% { clip: rect(23px, 9999px, 54px, 0); }
+            100% { clip: rect(54px, 9999px, 21px, 0); }
+        }
+
+        /* 输入区域 */
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        label {
+            color: var(--cyan);
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .sys-msg {
+            color: var(--red);
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--purple);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            font-size: 1rem;
+            padding: 1rem;
+            resize: vertical;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        textarea:focus {
+            border-color: var(--cyan);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3) inset;
+        }
+
+        /* 赛博朋克按钮 */
+        button.cyber-btn {
+            background: transparent;
+            color: var(--yellow);
+            border: 2px solid var(--yellow);
+            padding: 1rem 2rem;
+            font-size: 1.5rem;
+            font-family: var(--font-main);
+            cursor: pointer;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            width: 100%;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+
+        button.cyber-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(252, 238, 10, 0.4), transparent);
+            transition: all 0.4s ease;
+        }
+
+        button.cyber-btn:hover {
+            background: rgba(252, 238, 10, 0.1);
+            box-shadow: 0 0 20px rgba(252, 238, 10, 0.4);
+            text-shadow: 0 0 5px var(--yellow);
+        }
+
+        button.cyber-btn:hover::before {
+            left: 100%;
+        }
+
+        button.cyber-btn:active {
+            transform: scale(0.98);
+        }
+
+        button.cyber-btn:disabled {
+            border-color: #555;
+            color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* 结果展示区域 */
+        .results-section {
+            display: none;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .prize-tier {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            opacity: 0.3;
+            transform: translateX(-20px);
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .prize-tier.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .prize-tier::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 30px; height: 30px;
+            background: currentColor;
+            clip-path: polygon(100% 0, 0 0, 100% 100%);
+            opacity: 0.5;
+        }
+
+        .prize-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            width: 150px;
+            text-transform: uppercase;
+        }
+
+        .winner-name {
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            flex-grow: 1;
+            text-align: right;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        /* 奖项特定颜色 */
+        .tier-1 { color: var(--yellow); border-color: var(--yellow); }
+        .tier-2 { color: var(--purple); border-color: var(--purple); }
+        .tier-3 { color: var(--cyan); border-color: var(--cyan); }
+        
+        .tier-1.active { box-shadow: 0 0 30px rgba(252, 238, 10, 0.2) inset; }
+        .tier-2.active { box-shadow: 0 0 30px rgba(188, 19, 254, 0.2) inset; }
+        .tier-3.active { box-shadow: 0 0 30px rgba(0, 243, 255, 0.2) inset; }
+
+        .decryption-mode .winner-name {
+            font-family: monospace;
+            opacity: 0.8;
+        }
+
+        /* 响应式 */
+        @media (max-width: 600px) {
+            h1.glitch { font-size: 1.8rem; }
+            .prize-tier { flex-direction: column; text-align: center; gap: 1rem; }
+            .winner-name { text-align: center; font-size: 1.5rem; }
+            .prize-name { width: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <div class="container">
+        <h1 class="glitch" data-text="NEON_LOTTERY_PROTOCOL">NEON_LOTTERY_PROTOCOL</h1>
+
+        <div class="input-section" id="inputSection">
+            <label>
+                <span>[INPUT_TARGET_DATA] // 参与者名单 (每行一人)</span>
+                <span class="sys-msg" id="sysMsg">ERR: DATA_INSUFFICIENT (至少需要3人)</span>
+            </label>
+            <textarea id="participantsList" placeholder="Enter names here...&#10;Alice&#10;Bob&#10;Charlie&#10;David&#10;Eve"></textarea>
+            <button class="cyber-btn" id="initBtn" onclick="initiateProtocol()">INITIATE_PROTOCOL // 开始抽奖</button>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <!-- 三等奖 -->
+            <div class="prize-tier tier-3" id="prize3">
+                <div class="prize-name">RARE // 三等奖</div>
+                <div class="winner-name" id="winner3">AWAITING_DATA...</div>
+            </div>
+            <!-- 二等奖 -->
+            <div class="prize-tier tier-2" id="prize2">
+                <div class="prize-name">EPIC // 二等奖</div>
+                <div class="winner-name" id="winner2">AWAITING_DATA...</div>
+            </div>
+            <!-- 一等奖 -->
+            <div class="prize-tier tier-1" id="prize1">
+                <div class="prize-name">LEGENDARY // 一等奖</div>
+                <div class="winner-name" id="winner1">AWAITING_DATA...</div>
+            </div>
+            
+            <button class="cyber-btn" id="resetBtn" style="display: none; margin-top: 1rem; border-color: var(--cyan); color: var(--cyan);" onclick="resetProtocol()">REBOOT_SYSTEM // 重新装载</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心真随机与算法模块 --- //
+
+        /**
+         * 获取真正的加密级随机浮点数 [0, 1)
+         * 替代 Math.random() 以保证绝对公平
+         */
+        function getSecureRandom() {
+            const randomBuffer = new Uint32Array(1);
+            window.crypto.getRandomValues(randomBuffer);
+            // Uint32 的最大值是 4294967295 (0xffffffff)
+            return randomBuffer[0] / (0xffffffff + 1);
+        }
+
+        /**
+         * Fisher-Yates 洗牌算法 (使用加密级随机源)
+         */
+        function secureShuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            
+            // 当还剩有元素未洗牌时
+            while (currentIndex !== 0) {
+                // 选取剩余元素中的一个
+                randomIndex = Math.floor(getSecureRandom() * currentIndex);
+                currentIndex--;
+
+                // 交换元素
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // --- 视觉与交互控制模块 --- //
+
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*';
+        let rollIntervals = {};
+
+        function generateRandomString(length) {
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length)); // 仅用于视觉动画，无关核心逻辑
+            }
+            return result;
+        }
+
+        function initiateProtocol() {
+            const rawInput = document.getElementById('participantsList').value;
+            // 清理空行并去重（防止同一个人写多行作弊，如果允许权重可移除去重逻辑）
+            // 这里我们仅去除首尾空格和空行，保留原样以应对同名情况
+            let names = rawInput.split('\n').map(n => n.trim()).filter(n => n !== '');
+            
+            // 简单的数组去重，保证同一个人只能中一次（严格模式）
+            names = [...new Set(names)];
+
+            const sysMsg = document.getElementById('sysMsg');
+
+            if (names.length < 3) {
+                sysMsg.style.opacity = '1';
+                setTimeout(() => sysMsg.style.opacity = '0', 3000);
+                return;
+            }
+
+            // 锁定界面
+            document.getElementById('inputSection').style.display = 'none';
+            const resultsSec = document.getElementById('resultsSection');
+            resultsSec.style.display = 'flex';
+            document.getElementById('resetBtn').style.display = 'none';
+
+            // 重置状态
+            [1, 2, 3].forEach(num => {
+                const el = document.getElementById(`prize${num}`);
+                el.classList.remove('active');
+                el.classList.add('decryption-mode');
+            });
+
+            // 核心执行：洗牌并抽取前三名
+            const shuffledNames = secureShuffle([...names]);
+            const finalWinners = {
+                3: shuffledNames[0], // 抽取到的第1个给三等奖
+                2: shuffledNames[1], // 抽取到的第2个给二等奖
+                1: shuffledNames[2]  // 抽取到的第3个给一等奖
+            };
+
+            // 开始滚动动画
+            startRolling(3, names);
+            startRolling(2, names);
+            startRolling(1, names);
+
+            // 安排解密揭晓时间线
+            // 三等奖 2.5秒后揭晓
+            setTimeout(() => revealWinner(3, finalWinners[3]), 2500);
+            // 二等奖 4.5秒后揭晓
+            setTimeout(() => revealWinner(2, finalWinners[2]), 4500);
+            // 一等奖 7.0秒后揭晓 (高潮)
+            setTimeout(() => revealWinner(1, finalWinners[1]), 7000);
+            
+            // 显示重置按钮
+            setTimeout(() => {
+                document.getElementById('resetBtn').style.display = 'block';
+            }, 7500);
+        }
+
+        function startRolling(tier, allNames) {
+            const el = document.getElementById(`winner${tier}`);
+            const tierEl = document.getElementById(`prize${tier}`);
+            tierEl.classList.add('active'); // 显示框体
+
+            // 快速闪动文字
+            rollIntervals[tier] = setInterval(() => {
+                // 50% 几率显示随机字符，50%几率显示名单里的人名混淆视听
+                if (Math.random() > 0.5) {
+                    el.innerText = generateRandomString(8 + Math.floor(Math.random() * 6));
+                } else {
+                    el.innerText = allNames[Math.floor(Math.random() * allNames.length)];
+                }
+            }, 60);
+        }
+
+        function revealWinner(tier, winnerName) {
+            clearInterval(rollIntervals[tier]);
+            const el = document.getElementById(`winner${tier}`);
+            const tierEl = document.getElementById(`prize${tier}`);
+            
+            tierEl.classList.remove('decryption-mode');
+            
+            // 最终显示的字符特效
+            el.innerText = `[ ${winnerName} ]`;
+            
+            // 添加闪烁特效
+            tierEl.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                tierEl.style.transform = 'scale(1)';
+            }, 200);
+        }
+
+        function resetProtocol() {
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('inputSection').style.display = 'flex';
+            
+            [1, 2, 3].forEach(num => {
+                document.getElementById(`prize${num}`).classList.remove('active');
+                document.getElementById(`winner${num}`).innerText = 'AWAITING_DATA...';
+            });
+        }
+    </script>
+</body>
+</html>
